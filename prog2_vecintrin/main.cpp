@@ -249,7 +249,49 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
-  
+  __cs149_vec_float value;
+  __cs149_vec_float result;
+  __cs149_vec_float zero = _cs149_vset_float(0.f);
+  __cs149_vec_float MAX_RESULT=_cs149_vset_float(9.999999);
+  __cs149_vec_int exponent;
+  __cs149_vec_int countV;//use to count the exp times
+  __cs149_mask maskALL,checkCon,setResult,clampResult;
+  maskALL=_cs149_init_ones();
+  int count;
+  for(int i=0;i<N;i+=VECTOR_WIDTH)
+  {
+    if(N-i<VECTOR_WIDTH)
+    {
+      maskALL=_cs149_init_ones(N-i);
+    }
+    //set the origin to the result
+    countV = _cs149_vset_int(0);
+    count=0;
+    result=_cs149_vset_float(1.f);
+    _cs149_vload_float(value,values+i,maskALL);
+    _cs149_veq_float(setResult,value,zero,maskALL);
+    _cs149_vset_float(result,0.f,setResult);
+    
+    //compute the exp
+    _cs149_vload_int(exponent,exponents+i,maskALL);
+    _cs149_vlt_int(checkCon,countV,exponent,maskALL);
+    while(_cs149_cntbits(checkCon))
+    {
+      _cs149_vmult_float(result,result,value,checkCon);
+      count++;
+      countV = _cs149_vset_int(count);
+      _cs149_vlt_int(checkCon,countV,exponent,maskALL);
+      //addUserLog("check!\n");
+    }
+
+    //clamp the result at 9.999999
+    _cs149_vgt_float(clampResult,result,MAX_RESULT,maskALL);
+    _cs149_vset_float(result,9.999999,clampResult);
+
+    //load to array
+    _cs149_vstore_float(output+i,result,maskALL);
+  }
+  //CS149Logger.printLog();
 }
 
 // returns the sum of all elements in values
@@ -270,11 +312,23 @@ float arraySumVector(float* values, int N) {
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
-  
+  float total=0.f;
+  float tmp;
+  __cs149_vec_float result;
+  __cs149_mask maskALL=_cs149_init_ones();
+  __cs149_mask maskFIRST=_cs149_init_ones(1);
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
-
+    int j=VECTOR_WIDTH;
+    _cs149_vload_float(result,values+i,maskALL);
+    while(j!=1)
+    {
+      _cs149_hadd_float(result,result);
+      _cs149_interleave_float(result,result);
+      j/=2;
+    }
+    _cs149_vstore_float(&tmp,result,maskFIRST);
+    total+=tmp;
   }
-
-  return 0.0;
+  return total;
 }
 
