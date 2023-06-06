@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <thread>
-
+#include <queue>
 #include "CycleTimer.h"
 
 typedef struct {
@@ -22,7 +22,8 @@ extern void mandelbrotSerial(
     int maxIterations,
     int output[]);
 
-
+std::queue<int> tasks;
+int lock;
 //
 // workerThreadStart --
 //
@@ -34,13 +35,36 @@ void workerThreadStart(WorkerArgs * const args) {
     // to compute a part of the output image.  For example, in a
     // program that uses two threads, thread 0 could compute the top
     // half of the image and thread 1 could compute the bottom half.
-    int divideStart[9]={0,7,9,11,12,13,15,17,24};
-    double startTime = CycleTimer::currentSeconds();
-    int startRow=args->height/args->numThreads/3*divideStart[args->threadId];
-    int numRows=args->height/args->numThreads/3*(divideStart[args->threadId+1]-divideStart[args->threadId]);
-    mandelbrotSerial(args->x0,args->y0,args->x1,args->y1,args->width,args->height,startRow,numRows,args->maxIterations,args->output);
-    double endTime = CycleTimer::currentSeconds();
-    printf("thread %d takes \t\t[%.3f] ms\n", args->threadId,endTime-startTime);
+    //int divideStart[9]={0,7,9,11,12,13,15,17,24};
+    //double startTime = CycleTimer::currentSeconds();
+    //int startRow=args->height/args->numThreads/3*divideStart[args->threadId];
+    //int numRows=args->height/args->numThreads/3*(divideStart[args->threadId+1]-divideStart[args->threadId]);
+    //mandelbrotSerial(args->x0,args->y0,args->x1,args->y1,args->width,args->height,startRow,numRows,args->maxIterations,args->output);
+    //double endTime = CycleTimer::currentSeconds();
+    //printf("thread %d takes \t\t[%.3f] ms\n", args->threadId,endTime-startTime);
+    lock=0;
+    int startRow=args->height/args->numThreads*args->threadId;
+    int numRow=args->height/args->numThreads/args->numThreads;
+    for(int i=0;i<args->numThreads;i++)
+    {
+        tasks.push(startRow+i*numRow);
+    }
+    if((args->height/args->numThreads)%args->numThreads)
+    mandelbrotSerial(args->x0,args->y0,args->x1,args->y1,args->width,args->height,startRow+args->numThreads*numRow,args->height/args->numThreads-numRow*args->numThreads,args->maxIterations,args->output);
+    int start;
+    while(!tasks.empty())
+    {
+        if(lock==0)
+        {
+            lock=1;
+            start=tasks.front();
+            tasks.pop();
+            lock=0;
+        }
+        else
+        continue;
+        mandelbrotSerial(args->x0,args->y0,args->x1,args->y1,args->width,args->height,start,numRow,args->maxIterations,args->output);
+    }
 }
 
 //
@@ -90,7 +114,8 @@ void mandelbrotThread(
     for (int i=1; i<numThreads; i++) {
         workers[i] = std::thread(workerThreadStart, &args[i]);
     }
-    
+    if(height%numThreads)
+    mandelbrotSerial(x0,y0,x1,y1,width,height,numThreads*(height/numThreads),height-numThreads*(height/numThreads),maxIterations,output);
     workerThreadStart(&args[0]);
 
     // join worker threads
