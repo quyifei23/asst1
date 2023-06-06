@@ -23,7 +23,6 @@ extern void mandelbrotSerial(
     int output[]);
 
 std::queue<int> tasks;
-int lock;
 //
 // workerThreadStart --
 //
@@ -42,7 +41,6 @@ void workerThreadStart(WorkerArgs * const args) {
     //mandelbrotSerial(args->x0,args->y0,args->x1,args->y1,args->width,args->height,startRow,numRows,args->maxIterations,args->output);
     //double endTime = CycleTimer::currentSeconds();
     //printf("thread %d takes \t\t[%.3f] ms\n", args->threadId,endTime-startTime);
-    lock=0;
     int startRow=args->height/args->numThreads*args->threadId;
     int numRow=args->height/args->numThreads/args->numThreads;
     for(int i=0;i<args->numThreads;i++)
@@ -54,15 +52,8 @@ void workerThreadStart(WorkerArgs * const args) {
     int start;
     while(!tasks.empty())
     {
-        if(lock==0)
-        {
-            lock=1;
-            start=tasks.front();
-            tasks.pop();
-            lock=0;
-        }
-        else
-        continue;
+        start=tasks.front();
+        tasks.pop();
         mandelbrotSerial(args->x0,args->y0,args->x1,args->y1,args->width,args->height,start,numRow,args->maxIterations,args->output);
     }
 }
